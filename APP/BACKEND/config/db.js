@@ -1,25 +1,29 @@
 const { MongoClient } = require('mongodb');
-const logger = require('../utils/logger');
+require("dotenv").config();
+// MongoDB connection URI and database name
+// const MONGO_URI = "mongodb://localhost:27017";
+const mongodb_url= process.env.MONGO_URI;
+const dbName = "audio_db";
 
-const url = 'mongodb+srv://zdart2026:ibzPcNPmJ71uFhnw@cluster0.dryjxuy.mongodb.net/';
-const dbName = 'LearnPro_AI'; //For Co-production
+// Create a new MongoClient instance
+const client = new MongoClient(mongodb_url);
 
-let client;
+// Function to connect to MongoDB
+async function connectToMongoDB() {
+  // Connect only if not already connected
+  if (!client.isConnected?.()) {
+    await client.connect();
+    console.log("✅ MongoDB is connected successfully!");
+  }
 
-//database connection
-async function connectToDatabase() {
-    if (!client) {
-        client = new MongoClient(url);
-        try {
-            await client.connect();
-            logger.loggerSuccess('Connected to the database');
-        } catch (error) {
-            logger.loggerError(`Error connecting to the database: ${error}`);
-            throw error;
-        }
-    }
+  // Get the database
+  const db = client.db(dbName);
 
-    return client.db(dbName);
+  // Return both db and client to be used elsewhere
+  return { db, client };
 }
 
-module.exports = { connectToDatabase };
+// Export the function so it can be used in other files
+module.exports = {
+  connectToMongoDB,
+};
