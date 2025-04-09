@@ -8,6 +8,6 @@ APP/BACKEND/node_modules/
 APP/BACKEND/Log/*.log
 ADMIN/BACKEND/Log/*.log
 
-/home/britto/Zdart/Wave/APP/BACKEND/controllers/credentials.json
+APP/BACKEND/controllers/credentials.json
 .env
 
