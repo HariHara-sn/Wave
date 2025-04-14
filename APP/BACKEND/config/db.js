@@ -3,7 +3,7 @@ require("dotenv").config();
 // MongoDB connection URI and database name
 // const MONGO_URI = "mongodb://localhost:27017";
 const mongodb_url= process.env.MONGO_URI;
-const dbName = "audio_db";
+const dbName = "Wave";
 
 // Create a new MongoClient instance
 const client = new MongoClient(mongodb_url);

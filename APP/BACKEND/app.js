@@ -7,10 +7,10 @@ const app = express()
 
 
 app.use(express.json());
-app.use("/upload",voiceAlertRoutes);
+app.use("/teacher/upload",voiceAlertRoutes);
 
 const port = process.env.PORT;
 
 app.listen(port,()=>{
-    console.log("Server is running at $",port);
+    console.log(`Server is running at ${port}`);
 })
