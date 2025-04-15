@@ -36,7 +36,12 @@ function getMimeType(filePath) {
 }
 
 async function uploadToDrive(filePath) {
-  const fileName = generateFilename(filePath);
+  // const fileName = generateFilename(filePath);
+
+  const fileName = path.basename(filePath); // "Kite IIIYear Milestone 2 Assignment.pdf"
+
+// Extract filename without extension
+  // const fileName = path.parse(fullFileName).name; 
   const mimeType = getMimeType(filePath);
 
   const fileMetadata = {
