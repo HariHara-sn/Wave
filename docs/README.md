@@ -1,1 +1,1 @@
-## Documents for LearnProAI
+## Documents for Wave
