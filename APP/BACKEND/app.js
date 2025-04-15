@@ -2,8 +2,13 @@ const express = require("express");
 const voiceAlertRoutes =  require("./routes/voiceAlertRoutes");
 
 require("dotenv").config();
-
+const cors = require("cors");
 const app = express()
+
+app.use(cors({
+    origin:"*",
+
+}))
 
 
 app.use(express.json());
