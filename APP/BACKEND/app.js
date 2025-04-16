@@ -1,5 +1,5 @@
 const express = require("express");
-const voiceAlertRoutes = require("./routes/voiceAlertRoutes");
+const voiceAlertRoutes =  require("./routes/teacherDriveRoutes");
 
 require("dotenv").config();
 
