@@ -378,36 +378,86 @@ exports.renameFileOnDrive = async (req, res) => {
     //   }
     // );
 
-    const updateResult = await collection.updateMany(
-      { [`${token}.file_id`]: fileId },
-      {
-        $set: { [`${token}.$[elem].file_name`]: newName },
-      },
-      {
-        arrayFilters: [{ "elem.file_id": fileId }],
+      const updateResult = await collection.updateMany(
+        { [`${token}.file_id`]: fileId },
+        {
+          $set: { [`${token}.$[elem].file_name`]: newName },
+        },
+        {
+          arrayFilters: [{ "elem.file_id": fileId }],
+        }
+      );
+  
+      await client.close();
+  
+      if (updateResult.matchedCount === 0) {
+        return res.status(404).json({
+          success: false,
+          message: "File not found in jwt-token-1 array.",
+        });
       }
-    );
-
-    await client.close();
-
-    if (updateResult.matchedCount === 0) {
-      return res.status(404).json({
+  
+      return res.status(200).json({
+        success: true,
+        message: `File renamed to "${newName}" in Drive and DB.`,
+        updatedCount: updateResult.modifiedCount,
+      });
+    } catch (err) {
+      console.error("Rename Error:", err);
+      return res.status(500).json({
         success: false,
-        message: "File not found in jwt-token-1 array.",
+        message: "Rename failed.",
+        error: err.message,
       });
     }
+  };
 
-    return res.status(200).json({
+
+  // This function will give all the files uploaded to the drive by individual teacher 
+
+  exports.filesUploadedByTeacher = async (req,res)=>{
+    try {
+
+      // Header is "authorization : Bearer 5243453423fds"
+      const authHeader = req.headers['authorization'];
+      console.log("authheader", authHeader);
+      // Check if token exists in header
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Missing or invalid token' });
+      }
+      const token = authHeader.split(' ')[1]; // Get the actual token part
+      console.log("token",token);
+      if (!token) {
+        return res.status(400).json({ success: false, message: "Token is missing in request headers." });
+      }
+
+      const { db, client } = await connectToMongoDB();
+      const collection = db.collection('Drive');
+      // const token = "jwt-token-1"; // You may receive this from `req.headers`, `req.cookies`, etc.
+
+      const projection = {};
+      projection[token] = 1; // Only include the specific token field in result
+
+      const result = await collection.findOne({}, { projection });
+
+      await client.close();
+
+      if (!result || !result[token]) {
+        return res.status(404).json({ success: false, message: "Token data not found in database." });
+      }
+      console.log(result[token]); 
+      return res.status(200).json({
       success: true,
-      message: `File renamed to "${newName}" in Drive and DB.`,
-      updatedCount: updateResult.modifiedCount,
-    });
-  } catch (err) {
-    console.error("Rename Error:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Rename failed.",
-      error: err.message,
-    });
+      token: token,
+      data: result[token],
+      });
+
+
+      }
+      catch(err){
+        console.error("Error fetching token data:", err);
+        return res.status(500).json({ success: false, message: "Internal server error", error: err.message });
+
+      }
   }
-};
+  
