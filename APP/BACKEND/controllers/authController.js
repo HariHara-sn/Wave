@@ -1,63 +1,97 @@
 //Core logic of our backend
 
 const bcrypt = require('bcryptjs');
-const generateToken = require('../utils/generateToken');
-const { getDB } = require('../config/db');
-//Register
-exports.register = async (req, res) => {
-  const { username, password, phno } = req.body;
+const { generateToken} = require('../utils/generateToken');
+const { connectToMongoDB } = require('../config/db');
 
-  if (!username || !password || !phno) {
-    return res.status(400).json({ message: 'Missing fields' });
+
+
+// put initial document in drive database
+async function initializeDriveDocument(userId, db) {
+  const drive = db.collection('Drive');
+  const driveDoc = { [userId]: [] };
+  // console.log("Type of tokein inside initialize document" , typeof token);
+
+  await drive.insertOne(driveDoc);
+}
+
+exports.register = async (req, res) => {
+  const { db, client } = await connectToMongoDB();
+  const { userId, password,fullName } = req.body;
+
+  if (!userId || !password) {
+    return res.status(400).json({ message: 'Username and password are required' });
   }
 
   try {
-    const users = getDB().collection('users');
-    const existingUser = await users.findOne({ username });
+    const users = db.collection('Users');
+
+    // Check if a document with the same username key exists
+    const existingUser = await users.findOne({ [userId]: { $exists: true } });
 
     if (existingUser) {
-      return res.status(401).json({ message: 'User already exists' });
+      return res.status(409).json({ message: 'User already exists' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const token = generateToken(username);
+    // const token = generateToken(username);
 
-    const newUser = { username, password: hashedPassword, phno, jwtToken: token };
-    await users.insertOne(newUser);
+    // Construct the document in the desired format
+    // const userDoc = { [username]: [hashedPassword, token] };
+    const userDoc = {
+      userId : userId,
+      fullname : fullName,
+      password : hashedPassword
+    }
+    await users.insertOne(userDoc);
+    await initializeDriveDocument(userId, db);
 
-    res.status(200).json({ message: 'User registered', token });
-
+    res.status(201).json({ message: 'User registered successfully'});
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Server error' });
+    console.error('Registration error:', err);
+    res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    await client.close();
   }
 };
 
-//Login
-exports.login = async (req, res) => {
-  const { username, password } = req.query;
 
-  if (!username || !password) {
-    return res.status(400).json({ message: 'Missing username or password' });
+//Login
+
+exports.login = async (req, res) => {
+  const { db, client } = await connectToMongoDB();
+  const { userId, password } = req.query;
+
+  if (!userId || !password) {
+    return res.status(400).json({ message: 'Missing userId or password' });
   }
 
   try {
-    const users = getDB().collection('users');
-    const user = await users.findOne({ username });
+    const users = db.collection('Users');
 
-    if (!user) {
-      return res.status(401).json({ message: 'No account with that username' });
+    // Find user document where key is the username
+    const userDoc = await users.findOne({ userId: userId });
+
+    if (!userDoc) {
+      return res.status(401).json({ message: 'User not found' });
     }
 
-    const passwordMatch = await bcrypt.compare(password, user.password);
-    if (!passwordMatch) {
-      return res.status(401).json({ message: 'Invalid username or password' });
-    }
+    const hashedPassword = userDoc.password;
 
-    res.status(200).json({ message: 'Login successful', token: user.jwtToken });
+    const isMatch = await bcrypt.compare(password, hashedPassword);
+
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid password' });
+    }
+    const jwtToken = generateToken(userId);
+
+    return res.status(200).json({ message: 'Login successful', token: jwtToken });
 
   } catch (err) {
-    console.error(err);
+    console.error('Login error:', err);
     res.status(500).json({ message: 'Server error' });
+  } finally {
+    await client.close();
   }
 };
+
