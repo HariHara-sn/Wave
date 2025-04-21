@@ -1,7 +1,10 @@
-const fs = require("fs");
-const path = require("path");
-const { google } = require("googleapis");
-const { connectToMongoDB } = require("../config/db");
+
+const fs = require('fs');
+const path = require('path');
+const { google } = require('googleapis');
+const { connectToMongoDB } = require('../config/db');
+const { decryptToken} = require('../utils/generateToken');
+
 
 const multer = require("multer");
 require("dotenv").config();
@@ -79,47 +82,87 @@ async function uploadToDrive(filePath) {
 
 // console.log("token : ",token);
 
-async function saveToMongoDB(
-  url,
-  fileId,
-  fileName,
-  fileType,
-  name,
-  teacherid,
-  token
-) {
-  const { db, client } = await connectToMongoDB();
-  const collection = db.collection("Drive");
-  //   await collection.insertOne({
-  //     name: name,
-  //     teacherid : teacherid,
-  //     role: "teacher",
-  //     file_url: url,
-  //     file_id: fileId,
-  //     file_name: fileName,
-  //     file_type: fileType,
-  //     timestamp: new Date()
-  //   });
+// async function saveToMongoDB(url, fileId, fileName, fileType,name , teacherid,token) {
+//   const { db, client } = await connectToMongoDB();
+//   const collection = db.collection('Drive');
+// //   await collection.insertOne({ 
+// //     name: name,
+// //     teacherid : teacherid,
+// //     role: "teacher", 
+// //     file_url: url, 
+// //     file_id: fileId,
+// //     file_name: fileName,
+// //     file_type: fileType,
+// //     timestamp: new Date() 
+// //   });
 
-  const input = {
+
+
+// const input = { 
+//         name: name,
+//         teacherid : teacherid,
+//         role: "teacher", 
+//         file_url: url, 
+//         file_id: fileId,
+//         file_name: fileName,
+//         file_type: fileType,
+//         timestamp: new Date() 
+//       }
+//     console.log("token in save to mongo db",[token]);
+//     const filter ={};
+//     const update = {
+//         $push: {
+//           [token]: input
+//         }
+//       };
+//     await collection.updateOne(filter, update,{ upsert: true });
+//   await client.close();
+// }
+
+async function saveToMongoDB(url, fileId, fileName, fileType, name, teacherid, token) {
+  const { db, client } = await connectToMongoDB();
+  const collection = db.collection('Drive');
+
+  const input = { 
     name: name,
     teacherid: teacherid,
-    role: "teacher",
-    file_url: url,
+    role: "teacher", 
+    file_url: url, 
     file_id: fileId,
     file_name: fileName,
     file_type: fileType,
-    timestamp: new Date(),
+    timestamp: new Date() 
   };
-  console.log("token", [token]);
-  const filter = {};
-  const update = {
-    $push: {
-      [token]: input,
-    },
-  };
-  await collection.updateOne(filter, update, { upsert: true });
-  await client.close();
+
+  try {
+    console.log("Token in saveToMongoDB:", token);
+
+    // Check if a document exists with the token as a key
+    // token = token.uuid;
+    const tokenDoc = await collection.findOne({ [token]: { $exists: true } });
+
+    if (!tokenDoc) {
+      console.log(" Token was not present");
+      return { success: false, message: "Token was not present" };
+    }
+
+    //  If token exists, push input into the corresponding array
+    const update = {
+      $push: {
+        [token]: input
+      }
+    };
+
+    await collection.updateOne({ [token]: { $exists: true } }, update);
+    console.log(" Data inserted successfully");
+    return { success: true, message: "Data inserted successfully" };
+
+  } catch (error) {
+    console.error(" Error saving to MongoDB:", error);
+    return { success: false, message: "MongoDB error", error };
+  } finally {
+    await client.close();
+  }
 }
 
 // function generateFilename(filePath) {
@@ -231,20 +274,16 @@ exports.uploadFileToDriveAndDB = [
         return res.status(401).json({ message: "Missing or invalid token" });
       }
 
-      const token = authHeader.trim().split(" ")[1]; // remove accidental spaces
-      console.log("token:", token);
+      const json_token = authHeader.trim().split(' ')[1]; // remove accidental spaces
+      // console.log("token:", token);
+      const token= decryptToken(json_token);
+      const new_token = token.uuid;
+      console.log("token after decrypted => ",new_token);
       // Assuming uploadToDrive() and saveToMongoDB are defined elsewhere
       const { url, fileId, fileName } = await uploadToDrive(filePath);
       const fileType = extension.substring(1); // Remove the dot
-      await saveToMongoDB(
-        url,
-        fileId,
-        fileName,
-        fileType,
-        name,
-        teacherId,
-        token
-      );
+      
+      await saveToMongoDB(url, fileId, fileName, fileType, name, teacherId,new_token);
 
       return res.status(200).json({
         success: true,
@@ -275,8 +314,9 @@ exports.deleteFileFromDriveAndDB = async (req, res) => {
       return res.status(401).json({ message: "Missing or invalid token" });
     }
 
-    const token = authHeader.split(" ")[1]; // Get the actual token part
-
+    const du_token = authHeader.split(' ')[1]; // Get the actual token part
+    const de_token = decryptToken(du_token);
+    const token = de_token.uuid;
     const { fileId } = req.body;
 
     // Delete from Drive
@@ -334,17 +374,21 @@ exports.deleteFileFromDriveAndDB = async (req, res) => {
 //
 
 exports.renameFileOnDrive = async (req, res) => {
-  try {
-    const authHeader = req.headers["authorization"];
-    console.log("authheader", authHeader);
-    // Check if token exists in header
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "Missing or invalid token" });
+    try {
+      const authHeader = req.headers['authorization'];
+      console.log("authheader", authHeader);
+  // Check if token exists in header
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Missing or invalid token' });
     }
 
-    const token = authHeader.split(" ")[1]; // Get the actual token part
+    const dummy_token = authHeader.split(' ')[1]; // Get the actual token part
 
-    console.log("token", token);
+    const decrypted_token = decryptToken(dummy_token);
+    const token = decrypted_token.uuid;
+
+    console.log("token",token);
+        
 
     const { fileId, newName } = req.body;
 
@@ -425,7 +469,9 @@ exports.renameFileOnDrive = async (req, res) => {
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ message: 'Missing or invalid token' });
       }
-      const token = authHeader.split(' ')[1]; // Get the actual token part
+      const duu_token = authHeader.split(' ')[1]; // Get the actual token part
+      const dee_token = decryptToken(duu_token);
+      const token = dee_token.uuid;
       console.log("token",token);
       if (!token) {
         return res.status(400).json({ success: false, message: "Token is missing in request headers." });
