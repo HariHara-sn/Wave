@@ -10,7 +10,7 @@ async function initializeDriveDocument(userId, db) {
 
   await drive.insertOne(driveDoc);
 }
-
+///------------------------------------Register ------------------------------------------
 exports.register = async (req, res) => {
   const { db, client } = await connectToMongoDB();
   const { userId, username, password } = req.body;
@@ -52,7 +52,7 @@ exports.register = async (req, res) => {
   }
 };
 
-//Login
+//------------------------------------Login ------------------------------------------
 
 exports.login = async (req, res) => {
   const { db, client } = await connectToMongoDB();
@@ -65,7 +65,7 @@ exports.login = async (req, res) => {
   try {
     const users = db.collection("Users");
 
-    // Find user document where key is the username
+
     const userDoc = await users.findOne({ userId: userId });
 
     if (!userDoc) {
@@ -81,9 +81,8 @@ exports.login = async (req, res) => {
     }
     const jwtToken = generateToken(userId);
 
-    return res
-      .status(200)
-      .json({ message: "Login successful", token: jwtToken });
+    return res.status(200).json({ message: "Login successful", token: jwtToken,user:{userId:userDoc.userId,username:userDoc.username} });
+
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ message: "Server error" });
