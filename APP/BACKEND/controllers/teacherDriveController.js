@@ -1,8 +1,10 @@
-const fs = require("fs");
-const path = require("path");
-const { google } = require("googleapis");
-const { connectToMongoDB } = require("../config/db");
-const { decryptToken } = require("../utils/generateToken");
+
+const fs = require('fs');
+const path = require('path');
+const { google } = require('googleapis');
+const { connectToMongoDB } = require('../config/db');
+const { decryptToken, findTheTokenFromJwt} = require('../utils/generateToken');
+
 
 const multer = require("multer");
 require("dotenv").config();
@@ -275,8 +277,12 @@ exports.uploadFileToDriveAndDB = [
         return res.status(401).json({ message: "Missing or invalid token" });
       }
 
-      const token = authHeader.trim().split(" ")[1]; // remove accidental spaces
-      console.log("token:", token);
+      const json_token = authHeader.trim().split(' ')[1]; // remove accidental spaces
+      // console.log("token:", token);
+      // const json_token = findTheTokenFromJwt();
+      const token= decryptToken(json_token);
+      const new_token = token.uuid;
+      console.log("token after decrypted => ",new_token);
       // Assuming uploadToDrive() and saveToMongoDB are defined elsewhere
       const { url, fileId, fileName } = await uploadToDrive(filePath);
       const fileType = extension.substring(1); // Remove the dot

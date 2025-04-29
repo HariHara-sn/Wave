@@ -1,6 +1,7 @@
 const express = require("express");
 const teacherDriveRoutes = require("./routes/teacherDriveRoutes");
 const authroutes = require("./routes/authroutes");
+// const socialMediaRoutes = require("./routes/socialMediaRoutes");p
 
 require("dotenv").config();
 
@@ -13,8 +14,15 @@ app.use(
 );
 
 app.use(express.json());
+
+// Teacher drive routes 
 app.use("/teacher/upload", teacherDriveRoutes);
-app.use("/user", authroutes);
+
+// Register and login routes 
+app.use("/user",authroutes)
+
+// Social Media routes 
+// app.use("/teacher/socialmedia", socialMediaRoutes)
 
 const port = process.env.PORT;
 
