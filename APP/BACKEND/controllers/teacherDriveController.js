@@ -230,7 +230,6 @@ exports.uploadFileToDriveAndDB = [
   // First step: handle file upload with Multer middleware
   upload.single("file"),
 
-  // Then process the uploaded file
   async (req, res) => {
     try {
       if (!req.file) {
@@ -240,7 +239,6 @@ exports.uploadFileToDriveAndDB = [
         });
       }
 
-      // Get the full path to the uploaded file
       const AbsolutefilePath = path.resolve(req.file.path);
 
       // const filePath = path.relative(__dirname, AbsolutefilePath);

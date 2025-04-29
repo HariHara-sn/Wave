@@ -1,7 +1,6 @@
 const express = require("express");
-const teacherDriveRoutes =  require("./routes/teacherDriveRoutes");
+const teacherDriveRoutes = require("./routes/teacherDriveRoutes");
 const authroutes = require("./routes/authroutes");
-
 
 require("dotenv").config();
 
@@ -15,7 +14,7 @@ app.use(
 
 app.use(express.json());
 app.use("/teacher/upload", teacherDriveRoutes);
-app.use("/user",authroutes)
+app.use("/user", authroutes);
 
 const port = process.env.PORT;
 
