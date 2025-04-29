@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const { google } = require('googleapis');
 const { connectToMongoDB } = require('../config/db');
-const { decryptToken} = require('../utils/generateToken');
+const { decryptToken, findTheTokenFromJwt} = require('../utils/generateToken');
 
 
 const multer = require("multer");
@@ -275,6 +275,7 @@ exports.uploadFileToDriveAndDB = [
 
       const json_token = authHeader.trim().split(' ')[1]; // remove accidental spaces
       // console.log("token:", token);
+      // const json_token = findTheTokenFromJwt();
       const token= decryptToken(json_token);
       const new_token = token.uuid;
       console.log("token after decrypted => ",new_token);
