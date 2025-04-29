@@ -1,11 +1,13 @@
 const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 require("dotenv").config()
+const {connectToMongoDB} = require("../config/db")
+
 const jwtSecret = process.env.JWT_SECRET;
 
 
 function generateToken(uuid) {
-  console.log("jwt secert key => ",jwtSecret);
+  // console.log("jwt secert key => ",jwtSecret);
   return jwt.sign({ uuid }, jwtSecret);
 }
 
@@ -42,4 +44,32 @@ function requestHeader(authHeader){
   return token;
 }
 
-module.exports = {generateToken, decryptToken, generateUserUUID,findTheTokenFromJwt,requestHeader};
+async function insertDataToMongodb(input , token){
+  const {db, client } = await connectToMongoDB();
+  const collection = db.collection('Posts');
+  if(!token){
+      return {message : "token was not present"};
+  }
+  try{
+  const tokenDoc = await collection.findOne({ [token]: { $exists: true } });
+
+  const update = {
+      $push: {
+        [token]: input
+      }
+    };
+
+  await collection.updateOne({ [token]: { $exists: true } }, update);
+  console.log(" Data inserted successfully");
+  return true;
+  }
+  catch(error){
+      return {message : error};
+  }
+  finally{
+      client.close();
+  }
+
+}
+
+module.exports = {generateToken, decryptToken, generateUserUUID,findTheTokenFromJwt,requestHeader,insertDataToMongodb};

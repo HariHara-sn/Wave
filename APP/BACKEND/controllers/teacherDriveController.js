@@ -118,14 +118,11 @@ async function uploadToDrive(filePath) {
 //   await client.close();
 // }
 
-async function saveToMongoDB(url, fileId, fileName, fileType, name, teacherid, token) {
+async function saveToMongoDB(url, fileId, fileName, fileType,  token) {
   const { db, client } = await connectToMongoDB();
   const collection = db.collection('Drive');
 
   const input = { 
-    name: name,
-    teacherid: teacherid,
-    role: "teacher", 
     file_url: url, 
     file_id: fileId,
     file_name: fileName,
@@ -245,7 +242,7 @@ exports.uploadFileToDriveAndDB = [
 
       console.log("filePath",filePath);
 
-      const { name, teacherId } = req.body;
+      // const { name, teacherId } = req.body;
 
       // Validate file extension
       const extension = path.extname(filePath).toLowerCase();
@@ -283,7 +280,7 @@ exports.uploadFileToDriveAndDB = [
       const { url, fileId, fileName } = await uploadToDrive(filePath);
       const fileType = extension.substring(1); // Remove the dot
       
-      await saveToMongoDB(url, fileId, fileName, fileType, name, teacherId,new_token);
+      await saveToMongoDB(url, fileId, fileName, fileType,new_token);
 
       return res.status(200).json({
         success: true,

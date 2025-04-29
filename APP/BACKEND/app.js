@@ -1,7 +1,7 @@
 const express = require("express");
 const teacherDriveRoutes =  require("./routes/teacherDriveRoutes");
 const authroutes = require("./routes/authroutes");
-// const socialMediaRoutes = require("./routes/socialMediaRoutes");p
+const socialMediaRoutes = require("./routes/socialMediaRoutes");
 
 require("dotenv").config();
 
@@ -22,7 +22,7 @@ app.use("/teacher/upload", teacherDriveRoutes);
 app.use("/user",authroutes)
 
 // Social Media routes 
-// app.use("/teacher/socialmedia", socialMediaRoutes)
+app.use("/teacher/socialmedia", socialMediaRoutes)
 
 const port = process.env.PORT;
 
