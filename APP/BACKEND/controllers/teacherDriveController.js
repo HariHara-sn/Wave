@@ -79,45 +79,6 @@ async function uploadToDrive(filePath) {
 }
 
 
-// console.log("token : ",token);
-
-// async function saveToMongoDB(url, fileId, fileName, fileType,name , teacherid,token) {
-//   const { db, client } = await connectToMongoDB();
-//   const collection = db.collection('Drive');
-// //   await collection.insertOne({ 
-// //     name: name,
-// //     teacherid : teacherid,
-// //     role: "teacher", 
-// //     file_url: url, 
-// //     file_id: fileId,
-// //     file_name: fileName,
-// //     file_type: fileType,
-// //     timestamp: new Date() 
-// //   });
-
-
-
-// const input = { 
-//         name: name,
-//         teacherid : teacherid,
-//         role: "teacher", 
-//         file_url: url, 
-//         file_id: fileId,
-//         file_name: fileName,
-//         file_type: fileType,
-//         timestamp: new Date() 
-//       }
-//     console.log("token in save to mongo db",[token]);
-//     const filter ={};
-//     const update = {
-//         $push: {
-//           [token]: input
-//         }
-//       };
-//     await collection.updateOne(filter, update,{ upsert: true });
-//   await client.close();
-// }
-
 async function saveToMongoDB(url, fileId, fileName, fileType,  token) {
   const { db, client } = await connectToMongoDB();
   const collection = db.collection('Drive');
@@ -161,54 +122,7 @@ async function saveToMongoDB(url, fileId, fileName, fileType,  token) {
   }
 }
 
-// function generateFilename(filePath) {
-//   const extension = path.extname(filePath).toLowerCase();
-//   const prefix = 'file';
-//   const now = new Date();
-//   const timestamp = now.toISOString()
-//     .replace(/T/, '_')
-//     .replace(/:/g, '')
-//     .replace(/\..+/, '');
-//   return `${prefix}_${timestamp}${extension}`;
-// }
-// const upload = multer({ dest: 'uploads/' });
 
-// exports.uploadFileToDriveAndDB = async (req, res) => {
-//   try {
-  
-  
-//     const {  name , teacherId } = req.body;
-    
-//     // Validate file extension
-//     const extension = path.extname(filePath).toLowerCase();
-//     if (!['.pdf', '.docx', '.pptx', '.mp3'].includes(extension)) {
-//       return res.status(400).json({ 
-//         success: false, 
-//         message: "Invalid file type. Only .pdf, .docx, .pptx, and .mp3 are allowed." 
-//       });
-//     }
-
-//     const { url, fileId, fileName } = await uploadToDrive(filePath);
-//     const fileType = extension.substring(1); // Remove the dot
-//     await saveToMongoDB(url, fileId, fileName, fileType,name,teacherId);
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "File uploaded to Drive & URL saved in MongoDB.",
-//       url,
-//       fileId,
-//       fileName,
-//       fileType
-//     });
-//   } catch (err) {
-//     console.error("Upload Error:", err);
-//     return res.status(500).json({ 
-//       success: false, 
-//       message: "Upload failed.",
-//       error: err.message 
-//     });
-//   }
-// };
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'uploads/');  // Store in the 'uploads/' folder
@@ -253,15 +167,6 @@ exports.uploadFileToDriveAndDB = [
         });
       }
       
-      // const authHeader = req.headers['authorization'];
-      // console.log("authheader:" ,authHeader)
-      //   // Check if token exists in header
-      //   if (!authHeader || !authHeader.startsWith('Bearer')) {
-      //     return res.status(401).json({ message: 'Missing or invalid token' });
-      //   }
-
-      // const token = authHeader.split(' ')[1]; // Get the actual token part
-      // console.log("token",token);
 
       const authHeader = req.headers['authorization'];
       console.log("authHeader:", authHeader);
@@ -347,30 +252,7 @@ exports.deleteFileFromDriveAndDB = async (req, res) => {
   }
 };
 
-//renmae the file from the drive and update it in the database
-// exports.renameFileOnDrive = async (req, res) => {
-//     try {
-//       const { fileId, newName } = req.body;
-  
-//       await driveService.files.update({
-//         fileId,
-//         requestBody: {
-//           name: newName,
-//         },
-//       });
-  
-//       return res.status(200).json({
-//         success: true,
-//         message: ` file renamed to "${newName}"`,
-//       });
-//     } catch (err) {
-//       console.error("Rename Error:", err);
-//       return res.status(500).json({ success: false, message: "Rename failed." });
-//     }
-//   };
-
-// 
-
+// rename the file in the drive as well as in the mongodb
 exports.renameFileOnDrive = async (req, res) => {
     try {
       const authHeader = req.headers['authorization'];
@@ -408,17 +290,7 @@ exports.renameFileOnDrive = async (req, res) => {
       // Connect to MongoDB
       const { db, client } = await connectToMongoDB();
       const collection = db.collection('Drive');
-  
-      // Update all matching elements in the 'jwt-token-1' array
-      // const updateResult = await collection.updateMany(
-      //   { "jwt-token-1.file_id": fileId },
-      //   {
-      //     $set: { "jwt-token-1.$[elem].file_name": newName },
-      //   },
-      //   {
-      //     arrayFilters: [{ "elem.file_id": fileId }],
-      //   }
-      // );
+
 
       const updateResult = await collection.updateMany(
         { [`${token}.file_id`]: fileId },
@@ -479,22 +351,30 @@ exports.renameFileOnDrive = async (req, res) => {
       const collection = db.collection('Drive');
       // const token = "jwt-token-1"; // You may receive this from `req.headers`, `req.cookies`, etc.
 
-      const projection = {};
-      projection[token] = 1; // Only include the specific token field in result
+      // const projection = {};
+      // projection[token] = 1; // Only include the specific token field in result
 
-      const result = await collection.findOne({}, { projection });
+      // const result = await collection.findOne({}, { projection });
+      const document = await collection.findOne({ [token]: { $exists: true } });
+
+      if (!document) {
+        return res.status(404).json({ message: 'No data found for the given ID' });
+      }
+  
+      // Return the value (array) of the dynamic field
+      res.json({ posts: document[token] });
 
       await client.close();
 
-      if (!result || !result[token]) {
-        return res.status(404).json({ success: false, message: "Token data not found in database." });
-      }
-      console.log(result[token]); 
-      return res.status(200).json({
-      success: true,
-      token: token,
-      data: result[token],
-      });
+      // if (!result || !result[token]) {
+      //   return res.status(404).json({ success: false, message: "Token data not found in database." });
+      // }
+      // console.log(result[token]); 
+      // return res.status(200).json({
+      // success: true,
+      // token: token,
+      // data: result[token],
+      // });
 
 
       }

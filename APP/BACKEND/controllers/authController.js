@@ -6,9 +6,18 @@ const { connectToMongoDB } = require('../config/db');
 
 
 
-// put initial document in drive database
-async function initializeDriveDocument(userId, db) {
+// put initial document in drive collection
+async function initializeDriveCollectionDocument(userId, db) {
   const drive = db.collection('Drive');
+  const driveDoc = { [userId]: [] };
+  // console.log("Type of tokein inside initialize document" , typeof token);
+
+  await drive.insertOne(driveDoc);
+}
+
+// put initial document in the post collection
+async function initializePostsCollectionDocument(userId, db) {
+  const drive = db.collection('Posts');
   const driveDoc = { [userId]: [] };
   // console.log("Type of tokein inside initialize document" , typeof token);
 
@@ -44,7 +53,8 @@ exports.register = async (req, res) => {
       password : hashedPassword
     }
     await users.insertOne(userDoc);
-    await initializeDriveDocument(userId, db);
+    await initializeDriveCollectionDocument(userId, db);
+    await initializePostsCollectionDocument(userId,db)
 
     res.status(201).json({ message: 'User registered successfully'});
   } catch (err) {

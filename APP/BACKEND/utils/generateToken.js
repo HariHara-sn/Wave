@@ -41,6 +41,7 @@ function requestHeader(authHeader){
   const duu_token = authHeader.split(' ')[1]; // Get the actual token part
   const dee_token = decryptToken(duu_token);
   const token = dee_token.uuid;
+  console.log("token => ",token);
   return token;
 }
 

@@ -1,5 +1,5 @@
 const {connectToMongoDB}  = require("../config/db");
-const  { requestHeader , insertDataToMongodb} = require("../utils/generateToken");
+const  { requestHeader , insertDataToMongodb,decryptToken} = require("../utils/generateToken");
 
 const path = require("path");
 const axios = require("axios");
@@ -71,7 +71,52 @@ exports.createPost = async (req,res)=>{
 }
 
 //api => "/teacher/socialmedia/viewPost" method = get
-exports.viewPost = (req,res)=>{
+exports.viewPost = async (req,res)=>{
+  try {
+
+    // Header is "authorization : Bearer 5243453423fds"
+    const authHeader = req.headers['authorization'];
+    console.log("authheader", authHeader);
+    // // Check if token exists in header
+    // if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    //   return res.status(401).json({ message: 'Missing or invalid token' });
+    // }
+    // const duu_token = authHeader.split(' ')[1]; // Get the actual token part
+    // const dee_token = decryptToken(duu_token);
+    const token = requestHeader(authHeader);
+    console.log("token",token);
+    if (!token) {
+      return res.status(400).json({ success: false, message: "Token is missing in request headers." });
+    }
+
+    const { db, client } = await connectToMongoDB();
+    const collection = db.collection('Posts');
+    // const token = "jwt-token-1"; // You may receive this from `req.headers`, `req.cookies`, etc.
+
+    const projection = {};
+    projection[token] = 1; // Only include the specific token field in result
+
+    const result = await collection.findOne({}, { projection });
+
+    await client.close();
+
+    if (!result || !result[token]) {
+      return res.status(404).json({ success: false, message: "Token data not found in database." });
+    }
+    console.log(result[token]); 
+    return res.status(200).json({
+    success: true,
+    token: token,
+    data: result[token],
+    });
+
+
+    }
+    catch(err){
+      console.error("Error fetching token data:", err);
+      return res.status(500).json({ success: false, message: "Internal server error", error: err.message });
+
+    }
 
 }
 
