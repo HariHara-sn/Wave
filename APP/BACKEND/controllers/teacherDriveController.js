@@ -5,6 +5,7 @@ const { connectToMongoDB } = require("../config/db");
 const { decryptToken, findTheTokenFromJwt } = require("../utils/generateToken");
 
 const multer = require("multer");
+const { log } = require("console");
 require("dotenv").config();
 
 const KEYFILEPATH = "controllers/credentials.json";
@@ -208,39 +209,46 @@ exports.deleteFileFromDriveAndDB = async (req, res) => {
   try {
     const authHeader = req.headers["authorization"];
 
-    // Check if token exists in header
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ message: "Missing or invalid token" });
     }
 
-    const du_token = authHeader.split(" ")[1]; // Get the actual token part
+    const du_token = authHeader.split(" ")[1];
     const de_token = decryptToken(du_token);
     const token = de_token.uuid;
     const { fileId } = req.body;
 
-    // Delete from Drive
-    await driveService.files.delete({ fileId });
+    // Delete from Google Drive
+    try {
+      await driveService.files.delete({ fileId: fileId });
+    } catch (err) {
+      console.warn(`Drive file not found or already deleted: ${fileId}`);
+    }
 
     // Delete from MongoDB
     const { db, client } = await connectToMongoDB();
     const collection = db.collection("Drive");
-    // let fileid = {fileId};
 
-    const filter = {};
-    console.log({ fileId });
+    const filter = { [token]: { $exists: true } };
     const update = {
       $pull: {
         [token]: { file_id: fileId },
       },
     };
 
-    await collection.updateOne(filter, update);
-    // await collection.deleteOne({ file_id: fileId });
+    const result = await collection.updateOne(filter, update);
     await client.close();
+
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "File not found in database for this token.",
+      });
+    }
 
     return res.status(200).json({
       success: true,
-      message: ` file with ID ${fileId} deleted from Drive and DB.`,
+      message: `File deleted Successfully.`,
     });
   } catch (err) {
     console.error("Delete Error:", err);
@@ -336,12 +344,10 @@ exports.filesUploadedByTeacher = async (req, res) => {
     const token = dee_token.uuid;
     console.log("token", token);
     if (!token) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Token is missing in request headers.",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Token is missing in request headers.",
+      });
     }
 
     const { db, client } = await connectToMongoDB();
@@ -376,12 +382,10 @@ exports.filesUploadedByTeacher = async (req, res) => {
     // });
   } catch (err) {
     console.error("Error fetching token data:", err);
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message: "Internal server error",
-        error: err.message,
-      });
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: err.message,
+    });
   }
 };
