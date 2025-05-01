@@ -2,6 +2,10 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 require("dotenv").config()
 const {connectToMongoDB} = require("../config/db")
+const fs = require('fs');
+const path = require('path');
+
+
 
 const jwtSecret = process.env.JWT_SECRET;
 
@@ -45,23 +49,12 @@ function requestHeader(authHeader){
   return token;
 }
 
-async function insertDataToMongodb(input , token){
+async function insertDataToMongodb(input, collectionName){
   const {db, client } = await connectToMongoDB();
-  const collection = db.collection('Posts');
-  if(!token){
-      return {message : "token was not present"};
-  }
+  const collection = db.collection(collectionName);
   try{
-  const tokenDoc = await collection.findOne({ [token]: { $exists: true } });
-
-  const update = {
-      $push: {
-        [token]: input
-      }
-    };
-
-  await collection.updateOne({ [token]: { $exists: true } }, update);
-  console.log(" Data inserted successfully");
+  await collection.insertOne(input);
+  console.log(" Data inserted successfully into ", collectionName ,"collection");
   return true;
   }
   catch(error){
@@ -73,4 +66,26 @@ async function insertDataToMongodb(input , token){
 
 }
 
-module.exports = {generateToken, decryptToken, generateUserUUID,findTheTokenFromJwt,requestHeader,insertDataToMongodb};
+const filePath = path.join(__dirname, 'ids.txt');
+
+if (!fs.existsSync(filePath)) {
+  fs.writeFileSync(filePath, '');
+}
+
+function generateUnique10DigitId() {
+  const existingIds = new Set(
+    fs.readFileSync(filePath, 'utf-8').split('\n').filter(Boolean)
+  );
+
+  let id;
+
+  do {
+    id = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+  } while (existingIds.has(id));
+
+  // Save the new ID to the file
+  fs.appendFileSync(filePath, id + '\n');
+  return id;
+}
+
+module.exports = {generateToken, decryptToken, generateUserUUID,findTheTokenFromJwt,requestHeader,insertDataToMongodb,generateUnique10DigitId};

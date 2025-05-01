@@ -1,5 +1,5 @@
 const {connectToMongoDB}  = require("../config/db");
-const  { requestHeader , insertDataToMongodb,decryptToken} = require("../utils/generateToken");
+const  { requestHeader , insertDataToMongodb, generateUnique10DigitId} = require("../utils/generateToken");
 
 const path = require("path");
 const axios = require("axios");
@@ -43,6 +43,7 @@ exports.createPost = async (req,res)=>{
     );
 
     const imageUrl = response.data.data.url;
+    const deleteUrl = response.data.data.delete_url;
     
 
 
@@ -50,15 +51,19 @@ exports.createPost = async (req,res)=>{
 
     // insert  the below detatils into the Posts collection 
     const now = new Date();
+    const postId = generateUnique10DigitId();
 
     const input = {
+        userId : token,
+        postId : postId,
         postContent : postContent,
         postUrl : imageUrl,
+        deleteUrl : deleteUrl,
         likes : [],
         comments : [],
         createdAt : now
     }
-    const resp = insertDataToMongodb(input,token);
+    const resp = insertDataToMongodb(input,"Posts");
     if(resp){
     res.status(200).json({message:"Data inserted into the Mongodb Successfully"});
     }
@@ -70,6 +75,9 @@ exports.createPost = async (req,res)=>{
 
 }
 
+
+
+
 //api => "/teacher/socialmedia/viewPost" method = get
 exports.viewPost = async (req,res)=>{
   try {
@@ -77,12 +85,6 @@ exports.viewPost = async (req,res)=>{
     // Header is "authorization : Bearer 5243453423fds"
     const authHeader = req.headers['authorization'];
     console.log("authheader", authHeader);
-    // // Check if token exists in header
-    // if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    //   return res.status(401).json({ message: 'Missing or invalid token' });
-    // }
-    // const duu_token = authHeader.split(' ')[1]; // Get the actual token part
-    // const dee_token = decryptToken(duu_token);
     const token = requestHeader(authHeader);
     console.log("token",token);
     if (!token) {
@@ -93,24 +95,16 @@ exports.viewPost = async (req,res)=>{
     const collection = db.collection('Posts');
     // const token = "jwt-token-1"; // You may receive this from `req.headers`, `req.cookies`, etc.
 
-    const projection = {};
-    projection[token] = 1; // Only include the specific token field in result
+    const document = await collection.find({userId :token }).toArray();
 
-    const result = await collection.findOne({}, { projection });
+      if (!document) {
+        return res.status(404).json({ message: 'No data found for the given ID' });
+      }
+  
+      // Return the value (array) of the dynamic field
+      res.json({ posts: document });
 
     await client.close();
-
-    if (!result || !result[token]) {
-      return res.status(404).json({ success: false, message: "Token data not found in database." });
-    }
-    console.log(result[token]); 
-    return res.status(200).json({
-    success: true,
-    token: token,
-    data: result[token],
-    });
-
-
     }
     catch(err){
       console.error("Error fetching token data:", err);
@@ -120,8 +114,53 @@ exports.viewPost = async (req,res)=>{
 
 }
 
+async function deleteImageFromImgBB(deleteUrl) {
+  try {
+    const response = await axios.get(deleteUrl);
+    console.log("response",response);
+    console.log("Image deleted successfully");
+    return true;
+  } catch (error) {
+    console.error("Error deleting image:", error.message);
+  }
+}
+
 //api => "/teacher/socialmedia/deletePost" method = post
-exports.deletePost = (req,res)=>{
+exports.deletePost = async (req,res)=>{
+
+  try {
+    
+    const authHeader = req.headers["authorization"];
+    const token = requestHeader(authHeader);
+  
+    const { postId } = req.body;
+
+    const {db,client} = await connectToMongoDB();
+    const collection = db.collection('Posts');
+    const post = await collection.findOne({postId : postId})
+    if(!post){
+      res.json({message: "post not present"});
+    }
+    const deleteUrl = post.deleteUrl;
+    deleteImageFromImgBB(deleteUrl);
+
+    const result = await collection.deleteOne({ postId: postId });
+
+    if (result.deletedCount === 1) {
+      console.log(` Document with postId ${postId} was deleted.`);
+    } else {
+      console.log(` No document found with postId ${postId}.`);
+    }
+
+    await client.close();
+    return res.status(200).json({ message: "Post deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting post:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  } finally {
+    await client.close();
+  }
+  
 
 }
 
