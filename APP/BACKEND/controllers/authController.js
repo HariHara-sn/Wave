@@ -95,7 +95,7 @@ exports.login = async (req, res) => {
     }
     const jwtToken = generateToken(userId);
 
-    return res.status(200).json({ message: 'Login successful', token: jwtToken });
+    return res.status(200).json({ message: 'Login successful', token: jwtToken,user:{userId:userDoc.userId,username:userDoc.username} });
 
   } catch (err) {
     console.error('Login error:', err);

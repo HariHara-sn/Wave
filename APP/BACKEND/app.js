@@ -1,5 +1,5 @@
 const express = require("express");
-const teacherDriveRoutes =  require("./routes/teacherDriveRoutes");
+const teacherDriveRoutes = require("./routes/teacherDriveRoutes");
 const authroutes = require("./routes/authroutes");
 const socialMediaRoutes = require("./routes/socialMediaRoutes");
 
