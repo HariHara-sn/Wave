@@ -24,7 +24,7 @@ app.use("/user",authroutes)
 // Social Media routes 
 app.use("/teacher/socialmedia", socialMediaRoutes)
 
-const port = process.env.PORT;
+const port = process.env.PORT || 5000;
 
 app.listen(port, () => {
   console.log(`Server is running at ${port}`);
