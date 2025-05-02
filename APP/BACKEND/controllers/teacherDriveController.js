@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const { google } = require("googleapis");
 const { connectToMongoDB } = require("../config/db");
-const { decryptToken, findTheTokenFromJwt } = require("../utils/generateToken");
+const { decryptToken, findTheTokenFromJwt, requestHeader } = require("../utils/generateToken");
 
 const multer = require("multer");
 const { log } = require("console");
@@ -79,41 +79,34 @@ async function uploadToDrive(filePath) {
   return { url: previewUrl, fileId, fileName };
 }
 
-async function saveToMongoDB(subjectName,classWithSection,unitNo,url, fileId, fileName, fileType, token) {
+async function saveToMongoDB(input) {
   const { db, client } = await connectToMongoDB();
   const collection = db.collection("Drive");
 
-  const input = {
-    subjectName : subjectName,
-    classWithSection : classWithSection,
-    unitNo : unitNo,
-    file_url: url,
-    file_id: fileId,
-    file_name: fileName,
-    file_type: fileType,
-    timestamp: new Date(),
-  };
+  
 
   try {
-    console.log("Token in saveToMongoDB:", token);
+    // console.log("Token in saveToMongoDB:", token);
 
     // Check if a document exists with the token as a key
     // token = token.uuid;
-    const tokenDoc = await collection.findOne({ [token]: { $exists: true } });
+    // const tokenDoc = await collection.findOne({ [token]: { $exists: true } });
 
-    if (!tokenDoc) {
-      console.log(" Token was not present");
-      return { success: false, message: "Token was not present" };
-    }
+    // if (!tokenDoc) {
+    //   console.log(" Token was not present");
+    //   return { success: false, message: "Token was not present" };
+    // }
 
-    //  If token exists, push input into the corresponding array
-    const update = {
-      $push: {
-        [token]: input,
-      },
-    };
+    // //  If token exists, push input into the corresponding array
+    // const update = {
+    //   $push: {
+    //     [token]: input,
+    //   },
+    // };
 
-    await collection.updateOne({ [token]: { $exists: true } }, update);
+    // await collection.updateOne({ [token]: { $exists: true } }, update);
+
+    await collection.insertOne(input);
     console.log(" Data inserted successfully");
     return { success: true, message: "Data inserted successfully" };
   } catch (error) {
@@ -188,7 +181,19 @@ exports.uploadFileToDriveAndDB = [
       const { url, fileId, fileName } = await uploadToDrive(filePath);
       const fileType = extension.substring(1); // Remove the dot
 
-      await saveToMongoDB(subjectName,classWithSection,unitNo, url, fileId, fileName, fileType, new_token);
+      const input = {
+        teacherId :new_token,
+        subjectName : subjectName,
+        classWithSection : classWithSection,
+        unitNo : unitNo,
+        file_url: url,
+        file_id: fileId,
+        file_name: fileName,
+        file_type: fileType,
+        timestamp: new Date(),
+      };
+
+      await saveToMongoDB(input);
 
       return res.status(200).json({
         success: true,
@@ -234,14 +239,8 @@ exports.deleteFileFromDriveAndDB = async (req, res) => {
     const { db, client } = await connectToMongoDB();
     const collection = db.collection("Drive");
 
-    const filter = { [token]: { $exists: true } };
-    const update = {
-      $pull: {
-        [token]: { file_id: fileId },
-      },
-    };
 
-    const result = await collection.updateOne(filter, update);
+    const result = await collection.deleteOne({file_id : fileId});
     await client.close();
 
     if (result.modifiedCount === 0) {
@@ -299,30 +298,18 @@ exports.renameFileOnDrive = async (req, res) => {
     const { db, client } = await connectToMongoDB();
     const collection = db.collection("Drive");
 
-    const updateResult = await collection.updateMany(
-      { [`${token}.file_id`]: fileId },
-      {
-        $set: { [`${token}.$[elem].file_name`]: newName },
-      },
-      {
-        arrayFilters: [{ "elem.file_id": fileId }],
-      }
+    const result = await collection.updateOne(
+      { file_id: fileId },               // Filter condition
+      { $set: { file_name: newName } } // Update operation
     );
 
-    await client.close();
-
-    if (updateResult.matchedCount === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "File not found in jwt-token-1 array.",
-      });
+    if (result.modifiedCount > 0) {
+      console.log("✅ Filename updated successfully.");
+      res.status(200).json({message:"filename updated successfully in the database"});
+    } else {
+      console.log("⚠️ No document found with the given fileid.");
+      res.json({message:"No document found with the given file id"});
     }
-
-    return res.status(200).json({
-      success: true,
-      message: `File renamed to "${newName}" in Drive and DB.`,
-      updatedCount: updateResult.modifiedCount,
-    });
   } catch (err) {
     console.error("Rename Error:", err);
     return res.status(500).json({
@@ -357,13 +344,8 @@ exports.filesUploadedByTeacher = async (req, res) => {
 
     const { db, client } = await connectToMongoDB();
     const collection = db.collection("Drive");
-    // const token = "jwt-token-1"; // You may receive this from `req.headers`, `req.cookies`, etc.
-
-    // const projection = {};
-    // projection[token] = 1; // Only include the specific token field in result
-
-    // const result = await collection.findOne({}, { projection });
-    const document = await collection.findOne({ [token]: { $exists: true } });
+   
+    const document = await collection.find({ teacherId : token}).toArray();
 
     if (!document) {
       return res
@@ -372,19 +354,10 @@ exports.filesUploadedByTeacher = async (req, res) => {
     }
 
     // Return the value (array) of the dynamic field
-    res.json({ posts: document[token] });
+    res.json({ posts: document });
 
     await client.close();
 
-    // if (!result || !result[token]) {
-    //   return res.status(404).json({ success: false, message: "Token data not found in database." });
-    // }
-    // console.log(result[token]);
-    // return res.status(200).json({
-    // success: true,
-    // token: token,
-    // data: result[token],
-    // });
   } catch (err) {
     console.error("Error fetching token data:", err);
     return res.status(500).json({
@@ -393,4 +366,28 @@ exports.filesUploadedByTeacher = async (req, res) => {
       error: err.message,
     });
   }
+};
+
+exports.teacherWithClass = async (req,res) => {
+  try{
+  const authHeader = req.headers["authorization"];
+  const token = requestHeader(authHeader);
+
+  const {db,client } = await connectToMongoDB();
+  const collection = db.collection("TeacherWithClass");
+
+  const result = await collection.find({teacherId :token}).toArray();
+
+  await client.close();
+  if(!result){
+    res.json({message: "teacher was not found"});
+  }
+  else{
+    res.json({teacherdetails : result , message : "teacher details fetch from database successfully."});
+  }
+}
+catch(error){
+  console.log("error",error);
+  res.json({message: "error in fetching data", error: error});
+}
 };

@@ -6,6 +6,8 @@ const axios = require("axios");
 const fs = require("fs");
 const FormData = require("form-data");
 
+const cloudinary = require("../config/cloudinary");
+
 //save the content to mongodb
 
 
@@ -29,25 +31,34 @@ exports.createPost = async (req,res)=>{
     
     // upload the image into imgBB.com
 
-    const filePath = path.join(__dirname, "..", "uploads", req.file.filename);
-    const formData = new FormData();
-    formData.append("image", fs.createReadStream(filePath));
-    formData.append("key", process.env.IMGBB_API_KEY);
-    // Upload to ImgBB
-    const response = await axios.post(
-      "https://api.imgbb.com/1/upload",
-      formData,
-      {
-        headers: formData.getHeaders(),
-      }
-    );
+    // const filePath = path.join(__dirname, "..", "uploads", req.file.filename);
+    // const formData = new FormData();
+    // formData.append("image", fs.createReadStream(filePath));
+    // formData.append("key", process.env.IMGBB_API_KEY);
+    // // Upload to ImgBB
+    // const response = await axios.post(
+    //   "https://api.imgbb.com/1/upload",
+    //   formData,
+    //   {
+    //     headers: formData.getHeaders(),
+    //   }
+    // );
 
-    const imageUrl = response.data.data.url;
-    const deleteUrl = response.data.data.delete_url;
+    // const imageUrl = response.data.data.url;
+    // const deleteUrl = response.data.data.delete_url;
     
 
+    //upload image to cloudinary 
+    const result = await cloudinary.uploader.upload(req.file.buffer, {
+      resource_type: 'auto', // auto-detect file type (image or video)
+      folder: 'posts', // optional, to organize the uploads
+    });
 
-    fs.unlinkSync(filePath); 
+    const imageUrl = result.secure_url;
+    const imageId = result.public_id;
+
+
+    // fs.unlinkSync(filePath); 
 
     // insert  the below detatils into the Posts collection 
     const now = new Date();
@@ -58,17 +69,18 @@ exports.createPost = async (req,res)=>{
         postId : postId,
         postContent : postContent,
         postUrl : imageUrl,
-        deleteUrl : deleteUrl,
+        imageId : imageId,
         likes : [],
         comments : [],
         createdAt : now
     }
     const resp = insertDataToMongodb(input,"Posts");
     if(resp){
-    res.status(200).json({message:"Data inserted into the Mongodb Successfully"});
+    res.status(200).json({postId : postId, message:"Data inserted into the Mongodb Successfully"});
     }
     }
     catch (error){
+      console.log("error",error);
         res.status(401).json({message:error});
     }
 
@@ -117,7 +129,7 @@ exports.viewPost = async (req,res)=>{
 async function deleteImageFromImgBB(deleteUrl) {
   try {
     const response = await axios.get(deleteUrl);
-    console.log("response",response);
+    console.log("response from imagbb.com ",response);
     console.log("Image deleted successfully");
     return true;
   } catch (error) {
