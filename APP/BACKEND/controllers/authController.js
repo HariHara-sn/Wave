@@ -1,7 +1,7 @@
 //Core logic of our backend
 
 const bcrypt = require('bcryptjs');
-const { generateToken} = require('../utils/generateToken');
+const { generateToken, requestHeader} = require('../utils/generateToken');
 const { connectToMongoDB } = require('../config/db');
 
 
@@ -105,3 +105,30 @@ exports.login = async (req, res) => {
   }
 };
 
+
+exports.detailsOfTeacher = async (req,res) => {
+
+  try{
+    const authHeader = req.headers["authorization"];
+    const token = await requestHeader(authHeader);
+
+    const subjectName  = req.body.subjectName;
+    const classes = req.body.classes;
+
+    const input = {
+      teacherId : token ,
+      subjectName : subjectName,
+      classes : classes
+    }
+    const {db,client } = await connectToMongoDB();
+    const collection = await db.collection("TeacherWithClass");
+
+    await collection.insertOne(input);
+    await client.close();
+
+    res.json ({message: "data inserted successfully"});
+  }
+  catch(error){
+    res.json({message : "error in inserting into database", error: error});
+  }
+};
